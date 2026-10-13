@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GHW 2026 · Real TimescaleDB continuous aggregate evidence</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f5f3;color:#183429;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:1180px;margin:auto;padding:42px 30px}h1{font-size:36px;line-height:1.15;letter-spacing:-1px;margin:12px 0}h2{font-size:25px;margin:0 0 12px}p{margin:10px 0}.eyebrow{font-size:13px;letter-spacing:2px;font-weight:700;text-transform:uppercase}.scope{color:#52655d;max-width:960px}.stamp{display:inline-block;padding:6px 12px;background:#d8eddf;color:#155234;border-radius:5px;font-size:14px;font-weight:700}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:25px 0}.metric,.card{background:#fff;border:1px solid #d6e1d9;border-radius:10px;padding:18px}.metric strong{display:block;font-size:30px;line-height:1.3}.metric span{font-size:13px;color:#596c62}.card{margin:16px 0;padding:24px}.flow{display:grid;grid-template-columns:1fr 1fr;gap:22px}code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}code{font-size:12px;overflow-wrap:anywhere}pre{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7f5;padding:14px;border-radius:6px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;border-bottom:1px solid #e0e7e2;padding:9px 10px;vertical-align:top}th{color:#597163;font-weight:600}.pass{color:#147540;font-weight:700;white-space:nowrap}.small{font-size:13px;color:#596c62}a{color:#176047}details{margin:12px 0}summary{cursor:pointer;font-weight:600}@media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr}h1{font-size:29px}main{padding:25px 15px}td:first-child{max-width:145px}}
+</style></head><body><main>
+<div class="eyebrow">Global Hack Week 2026 · Executed SQL evidence</div>
+<h1>Continuous aggregates with a verified real-time tail</h1>
+<span class="stamp">17 / 17 database assertions passed</span>
+<p class="scope">Actual isolated, self-hosted PostgreSQL 17.7 + TimescaleDB 2.22.1. Synthetic temperature readings; SQL prepared with Codex and executed in the real database. No Tiger Cloud or Copilot claim.</p>
+<p class="small">Database snapshot: 2026-10-13T18:33:22Z · TCP disabled · TimescaleDB telemetry off</p>
+<div class="grid"><div class="metric"><strong>20,162</strong><span>Final raw sensor readings</span></div><div class="metric"><strong>337</strong><span>Hourly sensor groups</span></div><div class="metric"><strong>2 → 0</strong><span>Stale buckets after refresh</span></div><div class="metric"><strong>0 stored</strong><span>New tail bucket visible through real-time SQL</span></div></div>
+<section class="card"><h2>What the database proved</h2><div class="flow"><div><strong>Historical data and explicit refresh</strong><p>Two sensors × seven days produced 20,160 original rows and 336 hourly groups. A late reading and an old correction left exactly two materialized buckets stale. Refresh repaired both; average, minimum, maximum and count all matched raw SQL truth.</p></div><div><strong>Fresh data beyond the watermark</strong><p>Real-time mode enabled with <code>materialized_only=false</code>. A new reading at 2026-10-08 00:10 UTC appeared without another refresh: average/min/max 30 °C, count 1. The actual backing materialization still contained zero rows for that bucket.</p></div></div><p class="small">An hourly refresh policy is configured with a 30-day start offset and 1-hour end offset. Background policy execution is not claimed. Late historical data still needs refresh; the raw real-time tail handles data newer than the watermark.</p></section>
+<section class="card"><h2>Measured query plans</h2><p>Before the real-time tail phase, both queries returned the same 336 rows over the same seven-day window. Actual <code>EXPLAIN (ANALYZE, BUFFERS)</code> execution times: raw aggregation <strong>3.574 ms</strong>; materialized CAGG read <strong>0.085 ms</strong>.</p><p class="small">One small local run with warm-cache effects; these observations are not a general speed guarantee or a benchmark of the final real-time union.</p></section>
+<section class="card"><h2>Observed assertions</h2><table><thead><tr><th>Check</th><th>Result</th><th>Database observation</th></tr></thead><tbody><tr><td>hypertable registered</td><td class="pass">PASS</td><td><code>{&quot;relation&quot;: &quot;ghw_cagg.readings&quot;}</code></td></tr><tr><td>baseline raw rows</td><td class="pass">PASS</td><td><code>{&quot;actual_rows&quot;: 20160, &quot;sensors&quot;: 2}</code></td></tr><tr><td>continuous aggregate registered</td><td class="pass">PASS</td><td><code>{&quot;bucket_width&quot;: &quot;1 hour&quot;, &quot;materialized_only&quot;: true}</code></td></tr><tr><td>with no data is empty</td><td class="pass">PASS</td><td><code>{&quot;materialized_rows&quot;: 0}</code></td></tr><tr><td>initial refresh matches raw</td><td class="pass">PASS</td><td><code>{&quot;mismatched_buckets&quot;: 0}</code></td></tr><tr><td>hourly cardinality matches raw</td><td class="pass">PASS</td><td><code>{&quot;materialized_groups&quot;: 336, &quot;raw_groups&quot;: 336}</code></td></tr><tr><td>historical correction updated one row</td><td class="pass">PASS</td><td><code>{&quot;updated_rows&quot;: 1}</code></td></tr><tr><td>late reading present</td><td class="pass">PASS</td><td><code>{&quot;actual_rows&quot;: 20161}</code></td></tr><tr><td>materialization remains unchanged before refresh</td><td class="pass">PASS</td><td><code>{&quot;changed_materialized_rows&quot;: 0}</code></td></tr><tr><td>late data and correction make two stale buckets</td><td class="pass">PASS</td><td><code>{&quot;mismatched_buckets&quot;: 2}</code></td></tr><tr><td>refresh repairs all stale buckets</td><td class="pass">PASS</td><td><code>{&quot;mismatched_buckets&quot;: 0}</code></td></tr><tr><td>refresh changes only two affected buckets</td><td class="pass">PASS</td><td><code>{&quot;changed_buckets&quot;: 2}</code></td></tr><tr><td>refresh policy configured</td><td class="pass">PASS</td><td><code>{&quot;matching_scheduled_jobs&quot;: 1}</code></td></tr><tr><td>real time mode enabled</td><td class="pass">PASS</td><td><code>{&quot;materialized_only&quot;: false}</code></td></tr><tr><td>real time tail visible without refresh</td><td class="pass">PASS</td><td><code>{&quot;average_c&quot;: 30.0, &quot;reading_count&quot;: 1, &quot;view_rows&quot;: 1}</code></td></tr><tr><td>real time tail is not materialized</td><td class="pass">PASS</td><td><code>{&quot;backing_relation&quot;: &quot;_timescaledb_internal._materialized_hypertable_2&quot;, &quot;stored_tail_rows&quot;: 0}</code></td></tr><tr><td>real time view matches all raw data</td><td class="pass">PASS</td><td><code>{&quot;mismatched_buckets&quot;: 0}</code></td></tr></tbody></table></section>
+<section class="card"><h2>Reproduce and inspect</h2><p><a href="cagg.sql">Full CAGG SQL</a> · <a href="CAGG.md">Detailed explanation</a> · <a href="evidence/results.json">Actual JSON snapshot</a> · <a href="README.md">Build and run instructions</a></p><details><summary>Actual CAGG SQL output — first 13 checks and measured query plans</summary><pre>Pager usage is off.
+Timing is on.
+SET
+Time: 3.318 ms
+psql:sql/cagg.sql:10: NOTICE:  extension &quot;timescaledb&quot; already exists, skipping
+CREATE EXTENSION
+Time: 0.108 ms
+CREATE SCHEMA
+Time: 0.538 ms
+CREATE TABLE
+Time: 3.041 ms
+CREATE FUNCTION
+Time: 1.504 ms
+PHASE 1: create a real hypertable and insert deterministic readings
+CREATE TABLE
+Time: 0.786 ms
+    create_hypertable    
+-------------------------
+ (1,ghw_cagg,readings,t)
+(1 row)
+
+Time: 2.275 ms
+INSERT 0 20160
+Time: 50.165 ms
+ANALYZE
+Time: 15.499 ms
+psql:sql/cagg.sql:61: NOTICE:  PASS: hypertable_registered; observed: {&quot;relation&quot;: &quot;ghw_cagg.readings&quot;}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 1.636 ms
+psql:sql/cagg.sql:65: NOTICE:  PASS: baseline_raw_rows; observed: {&quot;sensors&quot;: 2, &quot;actual_rows&quot;: 20160}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 1.481 ms
+PHASE 2: define hourly avg/min/max/count and explicitly materialize
+CREATE MATERIALIZED VIEW
+Time: 2.163 ms
+CREATE VIEW
+Time: 0.201 ms
+CREATE VIEW
+Time: 0.451 ms
+psql:sql/cagg.sql:116: NOTICE:  PASS: continuous_aggregate_registered; observed: {&quot;bucket_width&quot;: &quot;1 hour&quot;, &quot;materialized_only&quot;: true}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 1.141 ms
+psql:sql/cagg.sql:120: NOTICE:  PASS: with_no_data_is_empty; observed: {&quot;materialized_rows&quot;: 0}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 0.152 ms
+CALL
+Time: 6.983 ms
+psql:sql/cagg.sql:131: NOTICE:  PASS: initial_refresh_matches_raw; observed: {&quot;mismatched_buckets&quot;: 0}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 3.987 ms
+psql:sql/cagg.sql:138: NOTICE:  PASS: hourly_cardinality_matches_raw; observed: {&quot;raw_groups&quot;: 336, &quot;materialized_groups&quot;: 336}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 1.706 ms
+SELECT 336
+Time: 0.517 ms
+ hypertable_schema | hypertable_name | view_schema |     view_name      | view_owner | materialized_only | compression_enabled | materialization_hypertable_schema | materialization_hypertable_name |                             view_definition                             | finalized | invalidate_using 
+-------------------+-----------------+-------------+--------------------+------------+-------------------+---------------------+-----------------------------------+---------------------------------+-------------------------------------------------------------------------+-----------+------------------
+ ghw_cagg          | readings        | ghw_cagg    | hourly_temperature | ghw_lab    | t                 | f                   | _timescaledb_internal             | _materialized_hypertable_2      |  SELECT time_bucket(&#x27;01:00:00&#x27;::interval, observed_at) AS bucket,      +| t         | trigger
+                   |                 |             |                    |            |                   |                     |                                   |                                 |     sensor_id,                                                         +|           | 
+                   |                 |             |                    |            |                   |                     |                                   |                                 |     avg(temperature_c) AS average_c,                                   +|           | 
+                   |                 |             |                    |            |                   |                     |                                   |                                 |     min(temperature_c) AS minimum_c,                                   +|           | 
+                   |                 |             |                    |            |                   |                     |                                   |                                 |     max(temperature_c) AS maximum_c,                                   +|           | 
+                   |                 |             |                    |            |                   |                     |                                   |                                 |     count(*) AS reading_count                                          +|           | 
+                   |                 |             |                    |            |                   |                     |                                   |                                 |    FROM ghw_cagg.readings                                              +|           | 
+                   |                 |             |                    |            |                   |                     |                                   |                                 |   GROUP BY (time_bucket(&#x27;01:00:00&#x27;::interval, observed_at)), sensor_id; |           | 
+(1 row)
+
+Time: 0.879 ms
+         bucket         | sensor_id |      average_c      | minimum_c | maximum_c | reading_count 
+------------------------+-----------+---------------------+-----------+-----------+---------------
+ 2026-10-01 00:00:00+00 |         1 | 21.4750000000000000 |     20.00 |     22.95 |            60
+ 2026-10-01 00:00:00+00 |         2 | 23.4750000000000000 |     22.00 |     24.95 |            60
+ 2026-10-01 01:00:00+00 |         1 | 24.4750000000000000 |     23.00 |     25.95 |            60
+ 2026-10-01 01:00:00+00 |         2 | 26.4750000000000000 |     25.00 |     27.95 |            60
+ 2026-10-01 02:00:00+00 |         1 | 21.4750000000000000 |     20.00 |     22.95 |            60
+ 2026-10-01 02:00:00+00 |         2 | 23.4750000000000000 |     22.00 |     24.95 |            60
+ 2026-10-01 03:00:00+00 |         1 | 24.4750000000000000 |     23.00 |     25.95 |            60
+ 2026-10-01 03:00:00+00 |         2 | 26.4750000000000000 |     25.00 |     27.95 |            60
+(8 rows)
+
+Time: 0.051 ms
+PHASE 3: insert late data and correct an old reading
+INSERT 0 1
+Time: 0.291 ms
+psql:sql/cagg.sql:160: NOTICE:  PASS: historical_correction_updated_one_row; observed: {&quot;updated_rows&quot;: 1}
+DO
+Time: 0.213 ms
+psql:sql/cagg.sql:165: NOTICE:  PASS: late_reading_present; observed: {&quot;actual_rows&quot;: 20161}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 0.519 ms
+psql:sql/cagg.sql:175: NOTICE:  PASS: materialization_remains_unchanged_before_refresh; observed: {&quot;changed_materialized_rows&quot;: 0}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 0.395 ms
+psql:sql/cagg.sql:179: NOTICE:  PASS: late_data_and_correction_make_two_stale_buckets; observed: {&quot;mismatched_buckets&quot;: 2}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 2.888 ms
+SELECT 2
+Time: 3.268 ms
+         bucket         | sensor_id |    raw_average_c    | materialized_average_c | raw_minimum_c | materialized_minimum_c | raw_maximum_c | materialized_maximum_c | raw_count | materialized_count 
+------------------------+-----------+---------------------+------------------------+---------------+------------------------+---------------+------------------------+-----------+--------------------
+ 2026-10-02 04:00:00+00 |         1 | 21.8114754098360656 |    21.4750000000000000 |         20.00 |                  20.00 |         42.00 |                  22.95 |        61 |                 60
+ 2026-10-05 10:00:00+00 |         2 | 23.1791666666666667 |    23.4750000000000000 |          5.00 |                  22.00 |         24.95 |                  24.95 |        60 |                 60
+(2 rows)
+
+Time: 0.062 ms
+PHASE 4: refresh the invalidated history and recheck all aggregate fields
+CALL
+Time: 0.715 ms
+psql:sql/cagg.sql:195: NOTICE:  PASS: refresh_repairs_all_stale_buckets; observed: {&quot;mismatched_buckets&quot;: 0}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 3.017 ms
+psql:sql/cagg.sql:202: NOTICE:  PASS: refresh_changes_only_two_affected_buckets; observed: {&quot;changed_buckets&quot;: 2}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 0.243 ms
+         bucket         | sensor_id |      average_c      | minimum_c | maximum_c | reading_count 
+------------------------+-----------+---------------------+-----------+-----------+---------------
+ 2026-10-02 04:00:00+00 |         1 | 21.8114754098360656 |     20.00 |     42.00 |            61
+ 2026-10-05 10:00:00+00 |         2 | 23.1791666666666667 |      5.00 |     24.95 |            60
+(2 rows)
+
+Time: 0.216 ms
+PHASE 5: configure and inspect a hourly refresh policy
+ add_continuous_aggregate_policy 
+---------------------------------
+                            1000
+(1 row)
+
+Time: 0.381 ms
+psql:sql/cagg.sql:223: NOTICE:  PASS: refresh_policy_configured; observed: {&quot;matching_scheduled_jobs&quot;: 1}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 0.419 ms
+ job_id |              proc_name              | schedule_interval | scheduled |         initial_start         |                                    config                                     
+--------+-------------------------------------+-------------------+-----------+-------------------------------+-------------------------------------------------------------------------------
+   1000 | policy_refresh_continuous_aggregate | 01:00:00          | t         | 2026-10-13 19:24:25.526537+00 | {&quot;end_offset&quot;: &quot;01:00:00&quot;, &quot;start_offset&quot;: &quot;30 days&quot;, &quot;mat_hypertable_id&quot;: 2}
+(1 row)
+
+Time: 0.109 ms
+PHASE 6: capture actual PostgreSQL query plans and timings
+ANALYZE
+Time: 10.230 ms
+                                                                                                                                     QUERY PLAN                                                                                                                                     
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=4256.06..4281.27 rows=10081 width=114) (actual time=3.467..3.472 rows=336 loops=1)
+   Output: (time_bucket(&#x27;01:00:00&#x27;::interval, readings.observed_at)), readings.sensor_id, (avg(readings.temperature_c)), (min(readings.temperature_c)), (max(readings.temperature_c)), (count(*))
+   Sort Key: (time_bucket(&#x27;01:00:00&#x27;::interval, readings.observed_at)), readings.sensor_id
+   Sort Method: quicksort  Memory: 43kB
+   Buffers: shared hit=133
+   -&gt;  Finalize HashAggregate  (cost=3434.50..3585.71 rows=10081 width=114) (actual time=3.361..3.434 rows=336 loops=1)
+         Output: (time_bucket(&#x27;01:00:00&#x27;::interval, readings.observed_at)), readings.sensor_id, avg(readings.temperature_c), min(readings.temperature_c), max(readings.temperature_c), count(*)
+         Group Key: (time_bucket(&#x27;01:00:00&#x27;::interval, readings.observed_at)), readings.sensor_id
+         Batches: 1  Memory Usage: 657kB
+         Buffers: shared hit=133
+         -&gt;  Append  (cost=112.60..2199.57 rows=70567 width=114) (actual time=0.432..3.300 rows=336 loops=1)
+               Buffers: shared hit=133
+               -&gt;  Partial HashAggregate  (cost=112.60..263.81 rows=10081 width=114) (actual time=0.432..0.466 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_1_chunk.observed_at)), _hyper_1_1_chunk.sensor_id, PARTIAL avg(_hyper_1_1_chunk.temperature_c), PARTIAL min(_hyper_1_1_chunk.temperature_c), PARTIAL max(_hyper_1_1_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_1_chunk.observed_at), _hyper_1_1_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_1_chunk  (cost=0.00..69.40 rows=2880 width=16) (actual time=0.002..0.157 rows=2880 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_1_chunk.observed_at), _hyper_1_1_chunk.sensor_id, _hyper_1_1_chunk.temperature_c
+                           Filter: ((_hyper_1_1_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_1_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+               -&gt;  Partial HashAggregate  (cost=112.63..263.85 rows=10081 width=114) (actual time=0.423..0.459 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_2_chunk.observed_at)), _hyper_1_2_chunk.sensor_id, PARTIAL avg(_hyper_1_2_chunk.temperature_c), PARTIAL min(_hyper_1_2_chunk.temperature_c), PARTIAL max(_hyper_1_2_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_2_chunk.observed_at), _hyper_1_2_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_2_chunk  (cost=0.00..69.42 rows=2881 width=16) (actual time=0.002..0.157 rows=2881 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_2_chunk.observed_at), _hyper_1_2_chunk.sensor_id, _hyper_1_2_chunk.temperature_c
+                           Filter: ((_hyper_1_2_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_2_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+               -&gt;  Partial HashAggregate  (cost=112.60..263.81 rows=10081 width=114) (actual time=0.422..0.458 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_3_chunk.observed_at)), _hyper_1_3_chunk.sensor_id, PARTIAL avg(_hyper_1_3_chunk.temperature_c), PARTIAL min(_hyper_1_3_chunk.temperature_c), PARTIAL max(_hyper_1_3_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_3_chunk.observed_at), _hyper_1_3_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_3_chunk  (cost=0.00..69.40 rows=2880 width=16) (actual time=0.001..0.157 rows=2880 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_3_chunk.observed_at), _hyper_1_3_chunk.sensor_id, _hyper_1_3_chunk.temperature_c
+                           Filter: ((_hyper_1_3_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_3_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+               -&gt;  Partial HashAggregate  (cost=112.60..263.81 rows=10081 width=114) (actual time=0.424..0.459 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_4_chunk.observed_at)), _hyper_1_4_chunk.sensor_id, PARTIAL avg(_hyper_1_4_chunk.temperature_c), PARTIAL min(_hyper_1_4_chunk.temperature_c), PARTIAL max(_hyper_1_4_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_4_chunk.observed_at), _hyper_1_4_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_4_chunk  (cost=0.00..69.40 rows=2880 width=16) (actual time=0.001..0.155 rows=2880 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_4_chunk.observed_at), _hyper_1_4_chunk.sensor_id, _hyper_1_4_chunk.temperature_c
+                           Filter: ((_hyper_1_4_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_4_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+               -&gt;  Partial HashAggregate  (cost=112.60..263.81 rows=10081 width=114) (actual time=0.425..0.461 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_5_chunk.observed_at)), _hyper_1_5_chunk.sensor_id, PARTIAL avg(_hyper_1_5_chunk.temperature_c), PARTIAL min(_hyper_1_5_chunk.temperature_c), PARTIAL max(_hyper_1_5_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_5_chunk.observed_at), _hyper_1_5_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_5_chunk  (cost=0.00..69.40 rows=2880 width=16) (actual time=0.001..0.155 rows=2880 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_5_chunk.observed_at), _hyper_1_5_chunk.sensor_id, _hyper_1_5_chunk.temperature_c
+                           Filter: ((_hyper_1_5_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_5_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+               -&gt;  Partial HashAggregate  (cost=112.60..263.81 rows=10081 width=114) (actual time=0.490..0.525 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_6_chunk.observed_at)), _hyper_1_6_chunk.sensor_id, PARTIAL avg(_hyper_1_6_chunk.temperature_c), PARTIAL min(_hyper_1_6_chunk.temperature_c), PARTIAL max(_hyper_1_6_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_6_chunk.observed_at), _hyper_1_6_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_6_chunk  (cost=0.00..69.40 rows=2880 width=16) (actual time=0.002..0.155 rows=2880 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_6_chunk.observed_at), _hyper_1_6_chunk.sensor_id, _hyper_1_6_chunk.temperature_c
+                           Filter: ((_hyper_1_6_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_6_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+               -&gt;  Partial HashAggregate  (cost=112.60..263.81 rows=10081 width=114) (actual time=0.426..0.461 rows=48 loops=1)
+                     Output: (time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_7_chunk.observed_at)), _hyper_1_7_chunk.sensor_id, PARTIAL avg(_hyper_1_7_chunk.temperature_c), PARTIAL min(_hyper_1_7_chunk.temperature_c), PARTIAL max(_hyper_1_7_chunk.temperature_c), PARTIAL count(*)
+                     Group Key: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_7_chunk.observed_at), _hyper_1_7_chunk.sensor_id
+                     Batches: 1  Memory Usage: 433kB
+                     Buffers: shared hit=19
+                     -&gt;  Seq Scan on _timescaledb_internal._hyper_1_7_chunk  (cost=0.00..69.40 rows=2880 width=16) (actual time=0.001..0.155 rows=2880 loops=1)
+                           Output: time_bucket(&#x27;01:00:00&#x27;::interval, _hyper_1_7_chunk.observed_at), _hyper_1_7_chunk.sensor_id, _hyper_1_7_chunk.temperature_c
+                           Filter: ((_hyper_1_7_chunk.observed_at &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_1_7_chunk.observed_at &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                           Buffers: shared hit=19
+ Planning:
+   Buffers: shared hit=231
+ Planning Time: 0.307 ms
+ Execution Time: 3.574 ms
+(79 rows)
+
+Time: 4.180 ms
+                                                                                                                  QUERY PLAN                                                                                                                   
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=22.70..22.72 rows=6 width=114) (actual time=0.064..0.070 rows=336 loops=1)
+   Output: _materialized_hypertable_2.bucket, _materialized_hypertable_2.sensor_id, _materialized_hypertable_2.average_c, _materialized_hypertable_2.minimum_c, _materialized_hypertable_2.maximum_c, _materialized_hypertable_2.reading_count
+   Sort Key: _materialized_hypertable_2.bucket, _materialized_hypertable_2.sensor_id
+   Sort Method: quicksort  Memory: 43kB
+   Buffers: shared hit=6
+   -&gt;  Append  (cost=4.18..22.62 rows=6 width=114) (actual time=0.011..0.040 rows=336 loops=1)
+         Buffers: shared hit=6
+         -&gt;  Bitmap Heap Scan on _timescaledb_internal._hyper_2_9_chunk  (cost=4.18..11.30 rows=3 width=114) (actual time=0.011..0.015 rows=144 loops=1)
+               Output: _hyper_2_9_chunk.bucket, _hyper_2_9_chunk.sensor_id, _hyper_2_9_chunk.average_c, _hyper_2_9_chunk.minimum_c, _hyper_2_9_chunk.maximum_c, _hyper_2_9_chunk.reading_count
+               Recheck Cond: ((_hyper_2_9_chunk.bucket &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_2_9_chunk.bucket &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+               Heap Blocks: exact=2
+               Buffers: shared hit=3
+               -&gt;  Bitmap Index Scan on _hyper_2_9_chunk__materialized_hypertable_2_bucket_idx  (cost=0.00..4.18 rows=3 width=0) (actual time=0.008..0.008 rows=146 loops=1)
+                     Index Cond: ((_hyper_2_9_chunk.bucket &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_2_9_chunk.bucket &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                     Buffers: shared hit=1
+         -&gt;  Bitmap Heap Scan on _timescaledb_internal._hyper_2_8_chunk  (cost=4.18..11.30 rows=3 width=114) (actual time=0.008..0.014 rows=192 loops=1)
+               Output: _hyper_2_8_chunk.bucket, _hyper_2_8_chunk.sensor_id, _hyper_2_8_chunk.average_c, _hyper_2_8_chunk.minimum_c, _hyper_2_8_chunk.maximum_c, _hyper_2_8_chunk.reading_count
+               Recheck Cond: ((_hyper_2_8_chunk.bucket &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_2_8_chunk.bucket &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+               Heap Blocks: exact=2
+               Buffers: shared hit=3
+               -&gt;  Bitmap Index Scan on _hyper_2_8_chunk__materialized_hypertable_2_bucket_idx  (cost=0.00..4.18 rows=3 width=0) (actual time=0.006..0.006 rows=194 loops=1)
+                     Index Cond: ((_hyper_2_8_chunk.bucket &gt;= &#x27;2026-10-01 00:00:00+00&#x27;::timestamp with time zone) AND (_hyper_2_8_chunk.bucket &lt; &#x27;2026-10-08 00:00:00+00&#x27;::timestamp with time zone))
+                     Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=26
+ Planning Time: 0.077 ms
+ Execution Time: 0.085 ms
+(27 rows)
+
+Time: 0.237 ms
+OBSERVED DATABASE ASSERTIONS
+                    test_name                     | passed |                       observed                        
+--------------------------------------------------+--------+-------------------------------------------------------
+ hypertable_registered                            | t      | {&quot;relation&quot;: &quot;ghw_cagg.readings&quot;}
+ baseline_raw_rows                                | t      | {&quot;sensors&quot;: 2, &quot;actual_rows&quot;: 20160}
+ continuous_aggregate_registered                  | t      | {&quot;bucket_width&quot;: &quot;1 hour&quot;, &quot;materialized_only&quot;: true}
+ with_no_data_is_empty                            | t      | {&quot;materialized_rows&quot;: 0}
+ initial_refresh_matches_raw                      | t      | {&quot;mismatched_buckets&quot;: 0}
+ hourly_cardinality_matches_raw                   | t      | {&quot;raw_groups&quot;: 336, &quot;materialized_groups&quot;: 336}
+ historical_correction_updated_one_row            | t      | {&quot;updated_rows&quot;: 1}
+ late_reading_present                             | t      | {&quot;actual_rows&quot;: 20161}
+ materialization_remains_unchanged_before_refresh | t      | {&quot;changed_materialized_rows&quot;: 0}
+ late_data_and_correction_make_two_stale_buckets  | t      | {&quot;mismatched_buckets&quot;: 2}
+ refresh_repairs_all_stale_buckets                | t      | {&quot;mismatched_buckets&quot;: 0}
+ refresh_changes_only_two_affected_buckets        | t      | {&quot;changed_buckets&quot;: 2}
+ refresh_policy_configured                        | t      | {&quot;matching_scheduled_jobs&quot;: 1}
+(13 rows)
+
+Time: 0.077 ms
+ assertions_passed 
+-------------------
+                13
+(1 row)
+
+Time: 0.029 ms
+                                                 postgres_version                                                  
+-------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 17.7 on aarch64-apple-darwin24.5.0, compiled by Apple clang version 17.0.0 (clang-1700.0.13.5), 64-bit
+(1 row)
+
+Time: 0.027 ms
+   extname   | extversion 
+-------------+------------
+ timescaledb | 2.22.1
+(1 row)
+
+Time: 0.307 ms
+</pre></details><details><summary>Actual real-time tail SQL output — four additional checks</summary><pre>Pager usage is off.
+Timing is on.
+SET
+Time: 8.932 ms
+PHASE 7: prove the real-time tail without another refresh
+ALTER MATERIALIZED VIEW
+Time: 4.487 ms
+psql:sql/real-time-tail.sql:19: NOTICE:  PASS: real_time_mode_enabled; observed: {&quot;materialized_only&quot;: false}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 8.261 ms
+INSERT 0 1
+Time: 3.702 ms
+psql:sql/real-time-tail.sql:30: NOTICE:  PASS: real_time_tail_visible_without_refresh; observed: {&quot;average_c&quot;: 30.0000000000000000, &quot;view_rows&quot;: 1, &quot;reading_count&quot;: 1}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 1.298 ms
+psql:sql/real-time-tail.sql:56: NOTICE:  PASS: real_time_tail_is_not_materialized; observed: {&quot;backing_relation&quot;: &quot;_timescaledb_internal._materialized_hypertable_2&quot;, &quot;stored_tail_rows&quot;: 0}
+DO
+Time: 2.183 ms
+psql:sql/real-time-tail.sql:60: NOTICE:  PASS: real_time_view_matches_all_raw_data; observed: {&quot;mismatched_buckets&quot;: 0}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 10.227 ms
+         bucket         | sensor_id |      average_c      | minimum_c | maximum_c | reading_count 
+------------------------+-----------+---------------------+-----------+-----------+---------------
+ 2026-10-08 00:00:00+00 |         1 | 30.0000000000000000 |     30.00 |     30.00 |             1
+(1 row)
+
+Time: 0.331 ms
+</pre></details><details><summary>Database environment read-back</summary><pre>                                                      version                                                      
+-------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 17.7 on aarch64-apple-darwin24.5.0, compiled by Apple clang version 17.0.0 (clang-1700.0.13.5), 64-bit
+(1 row)
+
+ listen_addresses 
+------------------
+ 
+(1 row)
+
+ timescaledb.telemetry_level 
+-----------------------------
+ off
+(1 row)
+
+   extname   | extversion 
+-------------+------------
+ plpgsql     | 1.0
+ timescaledb | 2.22.1
+ vector      | 0.8.1
+(3 rows)
+
+</pre></details><details><summary>Official source archive SHA-256 hashes</summary><pre>ef9e343302eccd33112f1b2f0247be493cb5768313adeb558b02de8797a2e9b5  sources/postgresql-17.7.tar.bz2
+4593bb6188f09fa896fa60ff9f045fa1ddcbac84bff69a73c2ce561755526922  sources/timescaledb-2.22.1.tar.gz
+a9094dfb85ccdde3cbb295f1086d4c71a20db1d26bf1d6c39f07a7d164033eb4  sources/pgvector-0.8.1.tar.gz
+</pre></details></section>
+<p class="small">This page is a static rendering of captured database results. It does not simulate the database or assert event acceptance.</p>
+</main></body></html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GHW 2026 · Live continuous aggregates</title>
+  <style>
+    :root{color-scheme:dark;--bg:#101820;--panel:#18242e;--line:#30424e;--text:#f0f5f5;--muted:#aac0c7;--green:#9de7c5;--red:#ffb3a5}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:1120px;margin:auto;padding:44px 28px 30px}.eyebrow{color:var(--green);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+    h1{font-size:clamp(29px,4vw,46px);line-height:1.1;letter-spacing:-.03em;margin:12px 0}p{color:var(--muted);margin:8px 0}
+    header{display:flex;justify-content:space-between;align-items:center;gap:24px}.live{border:1px solid var(--line);border-radius:20px;padding:7px 12px;font-size:13px;white-space:nowrap;color:var(--muted)}
+    .live.ready{color:var(--green);border-color:#4a7c69}.live.error{color:var(--red)}.meta{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin:22px 0;font-size:13px;color:var(--muted)}
+    button{font:inherit;cursor:pointer;padding:8px 14px;border:1px solid var(--line);border-radius:6px;color:var(--text);background:var(--panel)}button:hover{border-color:var(--green)}button:disabled{opacity:.55;cursor:wait}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0}.metric{padding:20px;border:1px solid var(--line);background:var(--panel);border-radius:10px}.label{color:var(--muted);font-size:13px}.value{font-size:34px;font-weight:650;letter-spacing:-.03em;margin-top:8px}.value.good{color:var(--green)}
+    .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:22px}.section{border-top:1px solid var(--line);padding-top:18px}h2{font-size:18px;font-weight:600;margin:0 0 14px}dl{margin:0}dl>div{display:flex;justify-content:space-between;gap:20px;padding:9px 0;border-bottom:1px solid #263844}dt{color:var(--muted);font-size:14px}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+    .tail{margin-top:22px;padding:18px;border:1px solid #456f5e;border-radius:10px;background:#182b28}.tail h2{color:var(--green)}.tail p{font-size:13px}.tail-values{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0 8px}.tail-values strong{display:block;font-size:22px}.tail-values span{color:var(--muted);font-size:12px}
+    #checks{list-style:none;padding:0;margin:0;display:grid;gap:5px;font-size:12px}#checks li{display:flex;gap:9px;color:var(--muted)}#checks .pass{color:var(--green);flex-shrink:0}.error-text{color:var(--red)}
+    footer{border-top:1px solid var(--line);margin-top:26px;padding-top:16px;display:flex;justify-content:space-between;gap:20px;font-size:12px;color:var(--muted)}a{color:var(--green)}details{margin-top:20px;font-size:12px;color:var(--muted)}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);padding:14px;border-radius:8px}
+    @media(max-width:760px){main{padding:28px 18px}header{align-items:flex-start}.metrics{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.value{font-size:29px}footer{flex-direction:column}.tail-values strong{font-size:18px}}
+  </style>
+</head>
+<body>
+<main>
+  <header><div><div class="eyebrow">Global Hack Week 2026 · Self-hosted TimescaleDB</div><h1>Live continuous aggregates</h1><p>Hourly temperature metrics, historical refreshes, and a real-time data tail.</p></div><div id="connection" class="live" role="status">Waiting for SQL</div></header>
+  <div class="meta"><span>Database query: <strong id="queried">—</strong></span><span>Read-only transaction: <strong id="readonly">—</strong></span><button id="refresh" type="button">Refresh live data</button></div>
+  <div id="error" class="error-text" role="alert"></div>
+  <section class="metrics" aria-label="Current database metrics">
+    <div class="metric"><div class="label">Raw sensor readings</div><div class="value" id="raw">—</div></div>
+    <div class="metric"><div class="label">Hourly sensor groups</div><div class="value" id="groups">—</div></div>
+    <div class="metric"><div class="label">Raw / CAGG mismatches</div><div class="value" id="mismatches">—</div></div>
+    <div class="metric"><div class="label">Persisted SQL assertions</div><div class="value" id="passed">—</div></div>
+  </section>
+  <div class="grid">
+    <section class="section"><h2>Current database state</h2><dl>
+      <div><dt>PostgreSQL</dt><dd id="postgres">—</dd></div><div><dt>TimescaleDB</dt><dd id="timescale">—</dd></div>
+      <div><dt>Real-time aggregation</dt><dd id="mode">—</dd></div><div><dt>materialized_only</dt><dd id="materialized">—</dd></div>
+      <div><dt>Hourly refresh policy</dt><dd id="policy">—</dd></div>
+    </dl><p style="font-size:12px">Policy configuration is reported here. Background execution is not claimed.</p>
+    <div class="tail"><h2>Latest bucket, queried live</h2><p><span id="bucket">—</span> · sensor <span id="sensor">—</span></p><div class="tail-values">
+      <div><strong id="average">—</strong><span>Average °C</span></div><div><strong id="minimum">—</strong><span>Minimum °C</span></div><div><strong id="maximum">—</strong><span>Maximum °C</span></div><div><strong id="count">—</strong><span>Readings</span></div>
+    </div><p>The recorded tail test observed this new bucket without another refresh and verified zero stored materialization rows. See the report for that test output.</p></div></section>
+    <section class="section"><h2>Assertions read from PostgreSQL</h2><ul id="checks"><li>No database response yet.</li></ul></section>
+  </div>
+  <details><summary>Inspect actual live query response</summary><pre id="json">No response yet.</pre></details>
+  <footer><span>Every refresh runs a fixed SQL query through psql over a private Unix socket. Synthetic sensor data.</span><a href="/report.html">Open recorded SQL evidence →</a></footer>
+</main>
+<script>
+  const byId=id=>document.getElementById(id);
+  let busy=false;
+  const liveIds=['raw','groups','mismatches','passed','postgres','timescale','mode','materialized','policy','readonly','bucket','sensor','average','minimum','maximum','count'];
+  async function refresh(){
+    if(busy)return;
+    busy=true;byId('refresh').disabled=true;
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
+    try{
+      const response=await fetch('/api/status',{cache:'no-store',signal:controller.signal});
+      const data=await response.json();if(!response.ok||data.error)throw new Error(data.error||'Live query failed.');
+      byId('queried').textContent=data.queried_at_utc;byId('readonly').textContent=data.transaction_read_only;
+      byId('raw').textContent=Number(data.raw_rows).toLocaleString('en-US');byId('groups').textContent=Number(data.hourly_groups).toLocaleString('en-US');
+      byId('mismatches').textContent=data.mismatched_buckets;byId('mismatches').classList.toggle('good',data.mismatched_buckets===0);
+      byId('passed').textContent=`${data.checks_passed} / ${data.checks_total}`;byId('passed').classList.toggle('good',data.checks_passed===data.checks_total);
+      byId('postgres').textContent=data.postgresql_version;byId('timescale').textContent=data.extensions?.timescaledb??'Unavailable';
+      byId('mode').textContent=data.real_time_enabled===true?'Enabled':data.real_time_enabled===false?'Disabled':'Unavailable';
+      byId('materialized').textContent=String(data.materialized_only);byId('policy').textContent=data.refresh_policy_configured?'Configured':'Absent';
+      const tail=data.latest_bucket;if(tail){byId('bucket').textContent=tail.bucket;byId('sensor').textContent=tail.sensor_id;
+        for(const [id,key]of[['average','average_c'],['minimum','minimum_c'],['maximum','maximum_c']])byId(id).textContent=Number(tail[key]).toFixed(2);
+        byId('count').textContent=tail.reading_count;}
+      byId('checks').replaceChildren();for(const check of data.checks??[]){const li=document.createElement('li');const badge=document.createElement('span');badge.className=check.passed?'pass':'error-text';badge.textContent=check.passed?'✓':'✗';const label=document.createElement('span');label.textContent=check.name.replaceAll('_',' ');li.append(badge,label);byId('checks').append(li);}
+      byId('json').textContent=JSON.stringify(data,null,2);byId('error').textContent='';byId('connection').textContent='● Live SQL response';byId('connection').className='live ready';
+    }catch(error){
+      for(const id of liveIds)byId(id).textContent='—';byId('checks').replaceChildren();byId('queried').textContent='Unavailable';
+      byId('json').textContent='No current database response.';byId('error').textContent=error.name==='AbortError'?'Live SQL query timed out.':error.message;
+      byId('connection').textContent='SQL unavailable';byId('connection').className='live error';
+    }finally{clearTimeout(timer);busy=false;byId('refresh').disabled=false;}
+  }
+  byId('refresh').addEventListener('click',refresh);refresh();setInterval(()=>{if(!document.hidden)refresh();},15000);
+</script>
+</body>
+</html>
