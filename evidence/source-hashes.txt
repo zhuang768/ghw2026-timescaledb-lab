@@ -1,0 +1,3 @@
+ef9e343302eccd33112f1b2f0247be493cb5768313adeb558b02de8797a2e9b5  sources/postgresql-17.7.tar.bz2
+4593bb6188f09fa896fa60ff9f045fa1ddcbac84bff69a73c2ce561755526922  sources/timescaledb-2.22.1.tar.gz
+a9094dfb85ccdde3cbb295f1086d4c71a20db1d26bf1d6c39f07a7d164033eb4  sources/pgvector-0.8.1.tar.gz

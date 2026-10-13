@@ -1,0 +1,39 @@
+Pager usage is off.
+Timing is on.
+SET
+Time: 8.932 ms
+PHASE 7: prove the real-time tail without another refresh
+ALTER MATERIALIZED VIEW
+Time: 4.487 ms
+psql:sql/real-time-tail.sql:19: NOTICE:  PASS: real_time_mode_enabled; observed: {"materialized_only": false}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 8.261 ms
+INSERT 0 1
+Time: 3.702 ms
+psql:sql/real-time-tail.sql:30: NOTICE:  PASS: real_time_tail_visible_without_refresh; observed: {"average_c": 30.0000000000000000, "view_rows": 1, "reading_count": 1}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 1.298 ms
+psql:sql/real-time-tail.sql:56: NOTICE:  PASS: real_time_tail_is_not_materialized; observed: {"backing_relation": "_timescaledb_internal._materialized_hypertable_2", "stored_tail_rows": 0}
+DO
+Time: 2.183 ms
+psql:sql/real-time-tail.sql:60: NOTICE:  PASS: real_time_view_matches_all_raw_data; observed: {"mismatched_buckets": 0}
+ assert_true 
+-------------
+ 
+(1 row)
+
+Time: 10.227 ms
+         bucket         | sensor_id |      average_c      | minimum_c | maximum_c | reading_count 
+------------------------+-----------+---------------------+-----------+-----------+---------------
+ 2026-10-08 00:00:00+00 |         1 | 30.0000000000000000 |     30.00 |     30.00 |             1
+(1 row)
+
+Time: 0.331 ms

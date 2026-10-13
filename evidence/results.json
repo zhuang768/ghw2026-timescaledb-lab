@@ -1,0 +1,154 @@
+{
+    "cagg": {
+        "checks": [
+            {
+                "name": "hypertable_registered",
+                "passed": true,
+                "observed": {
+                    "relation": "ghw_cagg.readings"
+                }
+            },
+            {
+                "name": "baseline_raw_rows",
+                "passed": true,
+                "observed": {
+                    "sensors": 2,
+                    "actual_rows": 20160
+                }
+            },
+            {
+                "name": "continuous_aggregate_registered",
+                "passed": true,
+                "observed": {
+                    "bucket_width": "1 hour",
+                    "materialized_only": true
+                }
+            },
+            {
+                "name": "with_no_data_is_empty",
+                "passed": true,
+                "observed": {
+                    "materialized_rows": 0
+                }
+            },
+            {
+                "name": "initial_refresh_matches_raw",
+                "passed": true,
+                "observed": {
+                    "mismatched_buckets": 0
+                }
+            },
+            {
+                "name": "hourly_cardinality_matches_raw",
+                "passed": true,
+                "observed": {
+                    "raw_groups": 336,
+                    "materialized_groups": 336
+                }
+            },
+            {
+                "name": "historical_correction_updated_one_row",
+                "passed": true,
+                "observed": {
+                    "updated_rows": 1
+                }
+            },
+            {
+                "name": "late_reading_present",
+                "passed": true,
+                "observed": {
+                    "actual_rows": 20161
+                }
+            },
+            {
+                "name": "materialization_remains_unchanged_before_refresh",
+                "passed": true,
+                "observed": {
+                    "changed_materialized_rows": 0
+                }
+            },
+            {
+                "name": "late_data_and_correction_make_two_stale_buckets",
+                "passed": true,
+                "observed": {
+                    "mismatched_buckets": 2
+                }
+            },
+            {
+                "name": "refresh_repairs_all_stale_buckets",
+                "passed": true,
+                "observed": {
+                    "mismatched_buckets": 0
+                }
+            },
+            {
+                "name": "refresh_changes_only_two_affected_buckets",
+                "passed": true,
+                "observed": {
+                    "changed_buckets": 2
+                }
+            },
+            {
+                "name": "refresh_policy_configured",
+                "passed": true,
+                "observed": {
+                    "matching_scheduled_jobs": 1
+                }
+            },
+            {
+                "name": "real_time_mode_enabled",
+                "passed": true,
+                "observed": {
+                    "materialized_only": false
+                }
+            },
+            {
+                "name": "real_time_tail_visible_without_refresh",
+                "passed": true,
+                "observed": {
+                    "average_c": 30.0,
+                    "view_rows": 1,
+                    "reading_count": 1
+                }
+            },
+            {
+                "name": "real_time_tail_is_not_materialized",
+                "passed": true,
+                "observed": {
+                    "backing_relation": "_timescaledb_internal._materialized_hypertable_2",
+                    "stored_tail_rows": 0
+                }
+            },
+            {
+                "name": "real_time_view_matches_all_raw_data",
+                "passed": true,
+                "observed": {
+                    "mismatched_buckets": 0
+                }
+            }
+        ],
+        "raw_rows": 20162,
+        "hourly_groups": 337,
+        "real_time_tail": {
+            "bucket": "2026-10-08T00:00:00+00:00",
+            "average_c": 30.0,
+            "maximum_c": 30.0,
+            "minimum_c": 30.0,
+            "sensor_id": 1,
+            "reading_count": 1
+        },
+        "real_time_enabled": true,
+        "mismatches_after_refresh": 0,
+        "stale_buckets_before_refresh": 2,
+        "hourly_refresh_policy_configured": true
+    },
+    "extensions": {
+        "vector": "0.8.1",
+        "timescaledb": "2.22.1"
+    },
+    "captured_at_utc": "2026-10-13T18:33:22Z",
+    "execution_scope": "isolated self-hosted database; no Tiger Cloud service",
+    "postgresql_version": "17.7",
+    "timescaledb_telemetry": "off",
+    "tcp_listening_disabled": true
+}

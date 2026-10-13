@@ -1,0 +1,22 @@
+                                                      version                                                      
+-------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 17.7 on aarch64-apple-darwin24.5.0, compiled by Apple clang version 17.0.0 (clang-1700.0.13.5), 64-bit
+(1 row)
+
+ listen_addresses 
+------------------
+ 
+(1 row)
+
+ timescaledb.telemetry_level 
+-----------------------------
+ off
+(1 row)
+
+   extname   | extversion 
+-------------+------------
+ plpgsql     | 1.0
+ timescaledb | 2.22.1
+ vector      | 0.8.1
+(3 rows)
+
